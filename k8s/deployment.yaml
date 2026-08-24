@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qm7-predictor
+  labels:
+    app: qm7-predictor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: qm7-predictor
+  template:
+    metadata:
+      labels:
+        app: qm7-predictor
+    spec:
+      containers:
+        - name: qm7-predictor
+          image: qm7-predictor:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
