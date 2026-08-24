@@ -1,0 +1,90 @@
+name: Retrain and promote
+
+# Runs weekly, on any push that touches training code or data, or manually.
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays 06:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - "app/train.py"
+      - "app/model.py"
+      - "data/**"
+  workflow_dispatch: {}
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    outputs:
+      promoted: ${{ steps.train.outputs.promoted }}
+      test_mae: ${{ steps.train.outputs.test_mae }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Persist the MLflow registry across workflow runs so the champion
+      # comparison in train.py has something to compare against. A real
+      # setup would point --mlflow-uri at a hosted MLflow server instead.
+      - name: Restore MLflow registry
+        uses: actions/cache@v4
+        with:
+          path: mlflow.db
+          key: mlflow-registry-v1
+
+      - name: Train, evaluate, and register
+        id: train
+        run: python app/train.py --data data/qm7.mat --out model/model.joblib
+
+      - name: Save MLflow registry
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: mlflow.db
+          key: mlflow-registry-v1
+
+      - name: Upload champion artifact
+        if: steps.train.outputs.promoted == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: champion-model
+          path: model/champion.joblib
+
+  build-and-push:
+    needs: retrain
+    if: needs.retrain.outputs.promoted == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download champion artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: champion-model
+          path: model/
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/qm7-predictor:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/qm7-predictor:latest
+          build-args: |
+            MAE=${{ needs.retrain.outputs.test_mae }}
