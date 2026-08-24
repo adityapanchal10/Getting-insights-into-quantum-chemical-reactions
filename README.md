@@ -1,4 +1,4 @@
-# QM7 atomization energy predictor — Kubernetes + MLOps prototype
+# QM7 atomization energy predictor - Kubernetes + MLOps prototype
 
 Ridge regression model from `Getting Insights into Quantum-Chemical Reactions.ipynb`, refactored into a trainable script, an MLflow-tracked experiment, a FastAPI service, and a Kubernetes deployment with autoscaling.
 
@@ -144,7 +144,7 @@ Watch terminal 2 - you should see `TARGETS` CPU utilization climb above 50% and 
 kind delete cluster --name qm7-demo
 ```
 
-## What this demonstrates (mapped to common JD language)
+## What this demonstrates 
 
 - **Model training, evaluation, versioning** — `train.py` + MLflow run tracking (params, metrics, artifact)
 - **Model serving via API** — FastAPI with a typed request/response schema
@@ -181,7 +181,7 @@ Only the champion's artifact is copied to `model/champion.joblib`, which is what
 
 1. Restores the MLflow registry from a GitHub Actions cache (so the champion comparison has history to compare against across runs)
 2. Runs `train.py`, which registers a version and reports `promoted` as a step output
-3. **Only if promoted** — builds the Docker image with the new champion baked in and pushes it to GHCR, tagged with the commit SHA
+3. **Only if promoted** - builds the Docker image with the new champion baked in and pushes it to GHCR, tagged with the commit SHA
 
 This is the gate that matters: most retraining runs on real data *won't* beat the current champion, and the workflow should do nothing in that case rather than ship a worse model. 
 
